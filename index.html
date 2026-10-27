@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>A short video from Eduardo · Kargare</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#141128;--paper:#FCFCFD;--border:#E3E3E8;--purple:#6A25DA;--teal:#14B8A5;--muted:#66676F}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:"Hanken Grotesk",Arial,sans-serif}
+main{max-width:460px;margin:auto;min-height:100vh;display:flex;flex-direction:column}
+.bar{display:flex;align-items:center;gap:10px;padding:20px 20px 10px}
+.mark{width:22px;height:22px;border-radius:50%;background:linear-gradient(90deg,var(--teal) 50%,var(--purple) 50%)}
+.brand{font:700 15px "Space Grotesk",Arial,sans-serif;letter-spacing:.06em}
+.hello{padding:4px 20px 14px}
+.hello h1{font:700 26px/1.15 "Space Grotesk",Arial,sans-serif;margin:0 0 6px;letter-spacing:-.02em}
+.hello p{margin:0;color:var(--muted);font-size:15px}
+.vid{margin:0 16px;border-radius:16px;overflow:hidden;background:#000;aspect-ratio:9/16;max-height:72vh;display:flex;justify-content:center}
+.vid video{height:100%;width:100%;object-fit:contain;display:block}
+.ask{padding:18px 20px 6px;font-size:16px;line-height:1.45}
+.ctas{display:flex;flex-direction:column;gap:10px;padding:8px 20px 24px}
+.btn{display:block;text-align:center;padding:14px;border-radius:12px;font-weight:700;text-decoration:none;font-size:16px}
+.btn.primary{background:var(--purple);color:#fff}
+.btn.ghost{border:1.5px solid var(--border);color:var(--ink);background:#fff}
+.foot{margin-top:auto;padding:14px 20px 20px;font-size:12px;color:var(--muted);border-top:1px solid var(--border)}
+.missing{padding:40px 20px;color:var(--muted)}
+</style>
+</head>
+<body>
+<main id="app">
+  <div class="bar"><div class="mark"></div><div class="brand">KARGARE</div></div>
+  <div class="hello"><h1 id="title">A short video for you</h1><p id="sub">From Eduardo</p></div>
+  <div class="vid"><video id="v" controls playsinline preload="metadata"></video></div>
+  <div class="ask" id="ask"></div>
+  <div class="ctas">
+    <a class="btn primary" id="reply" href="mailto:egalvan@kargare.com">Reply by email</a>
+    <a class="btn ghost" id="call" href="tel:+14644445312">Call or text Eduardo</a>
+  </div>
+  <div class="foot">Kargare LLC · truckload freight</div>
+</main>
+<script>
+(function(){
+  var API = 'https://otlnrfvuzwcjxpvvyell.supabase.co/functions/v1/video-event';
+  var slug = (location.pathname.match(/\/v\/([A-Za-z0-9-]+)/) || [])[1] || new URLSearchParams(location.search).get('v') || '';
+  var v = document.getElementById('v'), sent = {}, maxPct = 0, left = false;
+
+  function send(ev, pct){
+    var body = JSON.stringify({slug: slug, event: ev, pct: pct});
+    try { fetch(API, {method:'POST', body: body, keepalive: true, headers:{'content-type':'text/plain'}}); } catch(e){}
+  }
+  function once(ev, pct){ if (sent[ev]) return; sent[ev] = true; send(ev, pct); }
+
+  if (!slug) { document.getElementById('app').innerHTML = '<p class="missing">This link is not valid.</p>'; return; }
+
+  fetch(API + '?slug=' + encodeURIComponent(slug)).then(function(r){ return r.ok ? r.json() : null; }).then(function(d){
+    if (!d) { document.getElementById('app').innerHTML = '<p class="missing">This video is no longer available.</p>'; return; }
+    document.getElementById('title').textContent = 'Hi ' + d.lead_name + ', this one’s for you.';
+    document.getElementById('sub').textContent = (d.duration_label ? d.duration_label + ' ' : '') + 'from Eduardo';
+    document.getElementById('ask').textContent = d.question || '';
+    document.getElementById('reply').href = 'mailto:egalvan@kargare.com?subject=' + encodeURIComponent('Re: your video, ' + d.lead_name);
+    v.src = d.video_url;
+    once('open');
+  });
+
+  v.addEventListener('play', function(){ once('play'); });
+  v.addEventListener('timeupdate', function(){
+    if (!v.duration) return;
+    var p = Math.round(v.currentTime / v.duration * 100);
+    if (p > maxPct) maxPct = p;
+    if (p >= 25) once('p25', 25);
+    if (p >= 50) once('p50', 50);
+    if (p >= 75) once('p75', 75);
+  });
+  v.addEventListener('ended', function(){ maxPct = 100; once('done', 100); });
+  document.getElementById('reply').addEventListener('click', function(){ send('reply'); });
+  document.getElementById('call').addEventListener('click', function(){ send('call'); });
+
+  function leave(){
+    if (left || !sent.play || sent.done) return; left = true;
+    var body = JSON.stringify({slug: slug, event: 'leave', pct: maxPct});
+    if (navigator.sendBeacon) navigator.sendBeacon(API, new Blob([body], {type: 'text/plain'})); else send('leave', maxPct);
+  }
+  document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'hidden') leave(); });
+  window.addEventListener('pagehide', leave);
+})();
+</script>
+</body>
+</html>
